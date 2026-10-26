@@ -1,0 +1,1252 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>exteraGram (v5)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        html, body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; height: 100%; overflow: hidden; margin: 0; padding: 0; }
+        body { background-color: rgb(var(--bg-main-rgb)); color: var(--text-main); transition: background-color .4s ease, color .4s ease; }
+        /* Safari не даёт печатать в полях внутри select-none, поэтому поля возвращаем в «выделяемые» */
+        input, select, textarea { -webkit-user-select: text; user-select: text; color: var(--text-main); }
+        input::placeholder { color: rgba(var(--text-rgb), .38); }
+        ::-webkit-scrollbar { width: 3px; }
+        ::-webkit-scrollbar-thumb { background: rgba(var(--text-rgb), .2); border-radius: 3px; }
+
+        /* ───────── Темы (цвета как RGB-каналы, чтобы можно было делать прозрачность) ───────── */
+        body.theme-rose  { --bg-main-rgb: 15,23,42;  --bg-card-rgb: 30,41,59;  --accent: #e11d48; --accent-rgb: 225,29,72;  --text-main: #f1f5f9; --text-rgb: 241,245,249; --blob-opacity: .5; }
+        body.theme-dark  { --bg-main-rgb: 0,0,0;     --bg-card-rgb: 18,18,18;   --accent: #3b82f6; --accent-rgb: 59,130,246; --text-main: #e5e7eb; --text-rgb: 229,231,235; --blob-opacity: .45; }
+        body.theme-light { --bg-main-rgb: 248,250,252; --bg-card-rgb: 255,255,255; --accent: #2563eb; --accent-rgb: 37,99,235; --text-main: #0f172a; --text-rgb: 15,23,42; --blob-opacity: .3; }
+        body.theme-mono  { --bg-main-rgb: 17,17,17; --bg-card-rgb: 34,34,34;   --accent: #737373; --accent-rgb: 115,115,115; --text-main: #fafafa; --text-rgb: 250,250,250; --blob-opacity: .4; }
+
+        /* Обычные цвета + варианты с прозрачностью. Tailwind-синтаксис bg-custom-card/90 тут НЕ работает,
+           потому что custom-card — это не цвет из конфига Tailwind, поэтому раньше панели были «пустыми». */
+        .bg-custom-main { background-color: rgb(var(--bg-main-rgb)); }
+        .bg-custom-card { background-color: rgb(var(--bg-card-rgb)); }
+        .bg-main-a90 { background-color: rgba(var(--bg-main-rgb), .90); }
+        .bg-main-a80 { background-color: rgba(var(--bg-main-rgb), .80); }
+        .bg-main-a50 { background-color: rgba(var(--bg-main-rgb), .50); }
+        .bg-card-a90 { background-color: rgba(var(--bg-card-rgb), .90); }
+        .bg-card-a80 { background-color: rgba(var(--bg-card-rgb), .80); }
+        .bg-card-a70 { background-color: rgba(var(--bg-card-rgb), .70); }
+        .text-custom-accent { color: var(--accent); }
+        .bg-custom-accent { background-color: var(--accent); }
+        .border-custom-accent { border-color: var(--accent); }
+        .text-main { color: var(--text-main); }
+        .text-muted { color: rgba(var(--text-rgb), .55); }
+        .line { border-color: rgba(var(--text-rgb), .10); }
+        .row-hover:hover { background-color: rgba(var(--text-rgb), .06); }
+        #chats-list > * + * { border-top: 1px solid rgba(var(--text-rgb), .08); }
+        .glass { background-color: rgba(var(--bg-card-rgb), .72); -webkit-backdrop-filter: blur(16px) saturate(1.3); backdrop-filter: blur(16px) saturate(1.3); }
+        .input-field { background-color: rgba(var(--bg-main-rgb), .75); border: 1px solid rgba(var(--text-rgb), .14); }
+
+        /* ───────── Анимированный фон ───────── */
+        .bg-fx { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+        .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: var(--blob-opacity, .45); will-change: transform; transition: opacity .4s; }
+        .blob.b1 { width: 340px; height: 340px; background: var(--accent); top: -90px; left: -90px; animation: drift1 15s ease-in-out infinite alternate; }
+        .blob.b2 { width: 300px; height: 300px; background: #6366f1; right: -100px; top: 38%; animation: drift2 20s ease-in-out infinite alternate; }
+        .blob.b3 { width: 260px; height: 260px; background: #06b6d4; left: 18%; bottom: -100px; animation: drift3 24s ease-in-out infinite alternate; }
+        @keyframes drift1 { 0% { transform: translate(0,0) scale(1); } 100% { transform: translate(110px,170px) scale(1.25); } }
+        @keyframes drift2 { 0% { transform: translate(0,0) scale(1.1); } 100% { transform: translate(-130px,-110px) scale(.9); } }
+        @keyframes drift3 { 0% { transform: translate(0,0) scale(.9); } 100% { transform: translate(150px,-130px) scale(1.2); } }
+
+        /* ───────── Общие анимации ───────── */
+        @keyframes fadeIn   { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeOut  { from { opacity: 1; } to { opacity: 0; } }
+        @keyframes popIn    { from { opacity: 0; transform: scale(.92) translateY(10px); } to { opacity: 1; transform: none; } }
+        @keyframes popOut   { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(.94) translateY(8px); } }
+        @keyframes slideUp  { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        @keyframes slideDown { from { transform: translateY(0); } to { transform: translateY(100%); } }
+        @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        @keyframes slideOutRight { from { transform: translateX(0); } to { transform: translateX(100%); } }
+        @keyframes tabFromRight { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+        @keyframes tabFromLeft  { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
+        @keyframes rise     { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+        @keyframes letterIn { from { opacity: 0; transform: translateY(16px) scale(.85); filter: blur(6px); } to { opacity: 1; transform: none; filter: blur(0); } }
+        @keyframes logoIn   { from { opacity: 0; transform: scale(.4) rotate(-40deg); } to { opacity: 1; transform: scale(1) rotate(-6deg); } }
+        @keyframes shake    { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-9px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(3px); } }
+        @keyframes cardOut  { to { opacity: 0; transform: scale(.94) translateY(-14px); filter: blur(4px); } }
+        @keyframes rowIn    { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+        @keyframes badgePop { 0% { transform: scale(.4); } 70% { transform: scale(1.18); } 100% { transform: scale(1); } }
+
+        /* fill-mode: backwards — анимация не оставляет transform после окончания, поэтому не ломает transition'ы и fixed-потомков */
+        .animate-entry { animation: fadeIn .28s cubic-bezier(.16,1,.3,1) backwards; }
+        .pop-in { animation: popIn .3s cubic-bezier(.16,1,.3,1) backwards; }
+        .slide-up-screen { animation: slideUp .32s cubic-bezier(.16,1,.3,1) both; }
+        .slide-down-screen { animation: slideDown .26s cubic-bezier(.4,0,1,1) both; }
+        .slide-in-screen { animation: slideInRight .3s cubic-bezier(.16,1,.3,1) both; }
+        .slide-out-screen { animation: slideOutRight .24s cubic-bezier(.4,0,1,1) both; }
+        .tab-from-right { animation: tabFromRight .3s cubic-bezier(.16,1,.3,1) backwards; }
+        .tab-from-left { animation: tabFromLeft .3s cubic-bezier(.16,1,.3,1) backwards; }
+        .row-in { animation: rowIn .38s cubic-bezier(.16,1,.3,1) backwards; }
+        .badge-pop { animation: badgePop .35s ease; }
+
+        /* закрытие модалок */
+        .is-closing { animation: fadeOut .18s ease forwards; }
+        .is-closing > div { animation: popOut .18s ease forwards; }
+
+        /* ───────── Экран входа ───────── */
+        .reveal { animation: rise .65s cubic-bezier(.16,1,.3,1) backwards; animation-delay: calc(var(--i, 0) * 70ms + 120ms); }
+        .logo-in { animation: logoIn .7s cubic-bezier(.34,1.56,.64,1) backwards; animation-delay: .1s; transform: rotate(-6deg); }
+        .ltr { display: inline-block; animation: letterIn .6s cubic-bezier(.16,1,.3,1) backwards; }
+        #auth-title { transition: opacity .17s ease; min-height: 1.9rem; }
+        .swap-target { transition: opacity .17s ease, transform .17s ease; }
+        #auth-card.swapping .swap-target { opacity: 0; transform: translateY(6px); }
+        #auth-card.swapping #auth-title { opacity: 0; }
+        #auth-card.shake { animation: shake .42s ease; }
+        #auth-screen.auth-leave { animation: fadeOut .4s ease forwards; }
+        #auth-screen.auth-leave #auth-card { animation: cardOut .4s cubic-bezier(.4,0,1,1) forwards; }
+        /* имя при регистрации плавно «раскрывается» */
+        .collapsible { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .38s cubic-bezier(.16,1,.3,1), opacity .3s ease; }
+        .collapsible > div { overflow: hidden; min-height: 0; }
+        #auth-card.is-register .collapsible { grid-template-rows: 1fr; opacity: 1; }
+        #auth-btn:disabled { opacity: .65; }
+
+        /* ───────── Нижняя панель ───────── */
+        #bottom-nav { position: absolute; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 8px); height: 58px; border-radius: 24px; display: flex; align-items: center; justify-content: space-around; padding: 0 8px; z-index: 20;
+            border: 1px solid rgba(var(--text-rgb), .12); box-shadow: 0 10px 30px rgba(0,0,0,.35); background-color: rgba(var(--bg-card-rgb), .78); -webkit-backdrop-filter: blur(20px) saturate(1.5); backdrop-filter: blur(20px) saturate(1.5); }
+        #nav-pill { position: absolute; top: 6px; bottom: 6px; left: 0; width: 0; border-radius: 18px; background: rgba(var(--accent-rgb), .2); transition: transform .4s cubic-bezier(.34,1.3,.5,1), width .4s cubic-bezier(.34,1.3,.5,1); pointer-events: none; }
+        .nav-btn { position: relative; z-index: 1; width: 76px; padding: 6px 0; border-radius: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: rgba(var(--text-rgb), .5); transition: color .25s, transform .15s; }
+        .nav-btn:active { transform: scale(.92); }
+        .nav-btn.active { color: var(--accent); }
+        #fab { position: absolute; right: 16px; bottom: calc(env(safe-area-inset-bottom, 0px) + 78px); z-index: 20; transition: transform .3s cubic-bezier(.34,1.56,.64,1), opacity .2s; }
+        #fab.fab-hidden { transform: scale(0); opacity: 0; pointer-events: none; }
+        #accounts-menu { bottom: calc(env(safe-area-inset-bottom, 0px) + 76px); }
+        #chats-list, #settings-scroll { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); }
+
+        /* ───────── Сообщения ───────── */
+        .bubble-other { background-color: rgb(var(--bg-card-rgb)); color: var(--text-main); border: 1px solid rgba(var(--text-rgb), .07); }
+        .msg-actions { display: none; }
+        .msg.show-actions .msg-actions { display: flex; animation: fadeIn .18s ease backwards; }
+        @media (hover: hover) { .msg:hover .msg-actions { display: flex; } }
+        .sys-msg { align-self: center; font-size: 10px; padding: 4px 12px; border-radius: 999px; background-color: rgba(var(--text-rgb), .08); color: rgba(var(--text-rgb), .6); text-align: center; max-width: 90%; }
+        .mention { color: var(--accent); font-weight: 600; cursor: pointer; text-decoration: underline; }
+        .bubble-self .mention { color: #fff; }
+        .toast { transition: opacity .25s ease, transform .25s ease; opacity: 0; transform: translate(-50%, -14px); pointer-events: none; }
+        .toast.toast-show { opacity: 1; transform: translate(-50%, 0); }
+        .send-btn:active { transform: scale(.94); }
+        button { transition: transform .12s ease, opacity .2s ease, background-color .2s ease; }
+        button:active:not(:disabled) { transform: scale(.97); }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+            .blob { animation: none !important; }
+        }
+    </style>
+</head>
+<body class="theme-rose flex flex-col select-none relative h-[100dvh]">
+
+    <!-- Анимированный фон -->
+    <div class="bg-fx" aria-hidden="true">
+        <div class="blob b1"></div>
+        <div class="blob b2"></div>
+        <div class="blob b3"></div>
+    </div>
+
+    <div id="toast" class="toast fixed top-4 left-1/2 bg-slate-900 border border-slate-700 text-white text-xs px-4 py-2.5 rounded-2xl shadow-2xl z-[60]"></div>
+
+    <!-- Экран авторизации -->
+    <div id="auth-screen" class="fixed inset-0 bg-main-a90 backdrop-blur-xl z-50 flex items-center justify-center p-4 hidden">
+        <div id="auth-card" class="glass border line p-6 rounded-3xl w-full max-w-sm shadow-2xl relative z-10">
+            <div class="text-center mb-6">
+                <div class="logo-in w-16 h-16 bg-custom-accent rounded-3xl flex items-center justify-center mx-auto mb-3 shadow-lg">
+                    <svg class="w-9 h-9" viewBox="0 0 24 24" fill="white"><path d="M21.5 2.5L2 10.5L9.5 13.5L12.5 21.5L21.5 2.5Z"/></svg>
+                </div>
+                <h2 class="text-2xl font-bold tracking-wide" id="auth-title"></h2>
+                <p class="swap-target reveal text-[11px] text-muted mt-1" style="--i:2" id="auth-subtitle"></p>
+            </div>
+            <div>
+                <div class="collapsible" id="display-name-group">
+                    <div class="pb-3">
+                        <label class="swap-target text-[11px] text-muted mb-1 block font-medium">Ваше имя (1-12 символов)</label>
+                        <input type="text" id="auth-display-name" maxlength="12" placeholder="Иван" autocomplete="nickname" class="input-field w-full rounded-2xl px-4 py-3 text-xs outline-none focus:border-custom-accent transition">
+                    </div>
+                </div>
+                <div class="reveal pb-3" style="--i:3">
+                    <label class="text-[11px] text-muted mb-1 block font-medium">Юзернейм (4-12 символов)</label>
+                    <input type="text" id="auth-username" maxlength="12" placeholder="ivan_dev" autocomplete="username" autocapitalize="none" class="input-field w-full rounded-2xl px-4 py-3 text-xs outline-none focus:border-custom-accent transition">
+                </div>
+                <div class="reveal" style="--i:4">
+                    <label class="text-[11px] text-muted mb-1 block font-medium">Пароль</label>
+                    <input type="password" id="auth-password" placeholder="••••••••" autocomplete="current-password" class="input-field w-full rounded-2xl px-4 py-3 text-xs outline-none focus:border-custom-accent transition">
+                </div>
+                <div id="auth-error" class="text-rose-400 text-xs text-center hidden font-medium pt-3"></div>
+                <button type="button" onclick="submitAuth()" id="auth-btn" class="swap-target reveal w-full bg-custom-accent hover:opacity-90 text-white py-3 rounded-2xl text-xs font-semibold mt-4 shadow-lg" style="--i:5"></button>
+            </div>
+            <div class="text-center mt-5 reveal" style="--i:6">
+                <button type="button" onclick="toggleAuthMode()" id="auth-toggle-btn" class="swap-target text-xs text-custom-accent hover:underline font-medium"></button>
+                <div><button type="button" id="auth-cancel-btn" onclick="cancelAddAccount()" class="hidden text-[11px] text-muted hover:underline mt-3">Отмена</button></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно профиля -->
+    <div id="profile-modal" class="fixed inset-0 bg-black/60 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="pop-in glass border line p-6 rounded-3xl w-full max-w-xs text-center space-y-4 shadow-2xl relative z-10">
+            <div id="profile-avatar-container" class="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-3xl bg-custom-accent shadow-lg font-bold text-white"></div>
+            <div>
+                <h3 class="text-base font-bold break-words" id="profile-name">Имя</h3>
+                <div class="text-xs text-custom-accent mt-0.5 font-medium" id="profile-username">@username</div>
+            </div>
+            <div class="bg-custom-main p-2.5 rounded-2xl border line text-xs text-muted">
+                ID: <span id="profile-id" class="text-main font-mono font-semibold">1</span>
+            </div>
+            <div id="profile-invite-box" class="hidden space-y-2 text-left">
+                <label class="text-[11px] text-muted block">Пригласить в вашу группу</label>
+                <select id="invite-group-select" class="input-field w-full rounded-xl px-3 py-2 text-xs outline-none"></select>
+                <input type="text" id="invite-username-input" placeholder="Юзернейм друга (@username)" autocapitalize="none" class="input-field w-full rounded-xl px-3 py-2 text-xs outline-none">
+                <button onclick="sendGroupInviteFromProfile()" class="w-full bg-custom-accent text-white py-2 rounded-xl text-xs font-semibold">Пригласить</button>
+            </div>
+            <div class="flex gap-2 pt-2">
+                <button onclick="closeProfileModal()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-3 rounded-2xl text-xs font-medium">Закрыть</button>
+                <button onclick="startChatFromProfile()" class="flex-1 bg-custom-accent text-white py-3 rounded-2xl text-xs font-semibold shadow-lg">Написать</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Управление группой -->
+    <div id="group-settings-screen" class="fixed inset-0 bg-main-a90 backdrop-blur-xl z-40 hidden flex flex-col h-full w-full">
+        <div class="glass p-3 border-b line flex items-center gap-3">
+            <button onclick="closeGroupSettings()" class="text-muted hover:text-main p-1 text-lg font-bold">←</button>
+            <h3 class="text-xs font-bold">Управление группой</h3>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 space-y-4">
+            <div class="text-center">
+                <div id="gs-avatar" class="w-16 h-16 bg-custom-accent rounded-3xl mx-auto flex items-center justify-center text-3xl font-bold text-white shadow-xl mb-2">G</div>
+                <h3 id="gs-name-title" class="text-sm font-bold break-words">Название</h3>
+                <div id="gs-username-title" class="text-xs text-custom-accent">@group</div>
+            </div>
+            <div id="gs-owner-controls" class="glass p-4 rounded-3xl border line space-y-3 hidden">
+                <div>
+                    <label class="text-[11px] text-muted mb-1 block">Название группы</label>
+                    <input type="text" id="gs-name-input" maxlength="24" class="input-field w-full rounded-2xl px-3.5 py-2.5 text-xs outline-none">
+                </div>
+                <div>
+                    <label class="text-[11px] text-muted mb-1 block">Юзернейм группы (4-12 символов)</label>
+                    <input type="text" id="gs-username-input" maxlength="12" autocapitalize="none" class="input-field w-full rounded-2xl px-3.5 py-2.5 text-xs outline-none">
+                </div>
+                <div id="gs-error" class="text-rose-400 text-xs text-center hidden font-medium"></div>
+                <button onclick="saveGroupSettings()" class="w-full bg-custom-accent text-white py-2.5 rounded-2xl text-xs font-semibold">Сохранить</button>
+                <div class="pt-2 border-t line">
+                    <label class="text-[11px] text-muted mb-1 block">Пригласить участника</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="gs-invite-input" placeholder="@username" autocapitalize="none" class="input-field flex-1 min-w-0 rounded-2xl px-3.5 py-2.5 text-xs outline-none">
+                        <button onclick="sendGroupInviteFromSettings()" class="bg-custom-accent text-white px-4 rounded-2xl text-xs font-semibold">Позвать</button>
+                    </div>
+                </div>
+            </div>
+            <div class="glass p-4 rounded-3xl border line space-y-2">
+                <div class="text-xs font-semibold text-custom-accent mb-2">Участники</div>
+                <div id="gs-members-list" class="space-y-2"></div>
+            </div>
+            <button onclick="deleteGroup()" id="gs-delete-btn" class="w-full bg-rose-900/40 text-rose-400 py-3 rounded-2xl text-xs font-semibold border border-rose-900/30 hidden">Удалить группу</button>
+        </div>
+    </div>
+
+    <!-- Создание группы -->
+    <div id="group-modal" class="fixed inset-0 bg-black/60 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="pop-in glass border line p-6 rounded-3xl w-full max-w-xs space-y-4 shadow-2xl relative z-10">
+            <h3 class="text-sm font-bold text-center">Создать группу</h3>
+            <div>
+                <label class="text-[11px] text-muted mb-1 block">Название группы</label>
+                <input type="text" id="group-name-input" maxlength="24" placeholder="Тусовка" class="input-field w-full rounded-2xl px-3.5 py-2.5 text-xs outline-none">
+            </div>
+            <div>
+                <label class="text-[11px] text-muted mb-1 block">Юзернейм группы (4-12 символов)</label>
+                <input type="text" id="group-username-input" maxlength="12" placeholder="party_chat" autocapitalize="none" class="input-field w-full rounded-2xl px-3.5 py-2.5 text-xs outline-none">
+            </div>
+            <div>
+                <label class="text-[11px] text-muted mb-1 block">Юзернейм первого участника</label>
+                <input type="text" id="group-username-target" placeholder="ivan_dev" autocapitalize="none" class="input-field w-full rounded-2xl px-3.5 py-2.5 text-xs outline-none">
+            </div>
+            <div id="group-error" class="text-rose-400 text-xs text-center hidden font-medium"></div>
+            <div class="flex gap-2 pt-2">
+                <button onclick="closeGroupModal()" class="flex-1 bg-slate-800 text-slate-300 py-3 rounded-2xl text-xs font-medium">Отмена</button>
+                <button onclick="submitCreateGroup()" class="flex-1 bg-custom-accent text-white py-3 rounded-2xl text-xs font-semibold shadow-lg">Создать</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Меню аккаунтов -->
+    <div id="accounts-menu" class="absolute left-4 glass border line p-2 rounded-3xl shadow-2xl z-30 hidden w-64 pop-in">
+        <div id="accounts-list" class="space-y-1 mb-2"></div>
+        <button onclick="startAddAccount()" class="w-full bg-custom-main hover:opacity-80 text-custom-accent py-2.5 px-3 rounded-2xl text-xs font-semibold flex items-center gap-2 border line">
+            <span class="w-6 h-6 rounded-full bg-custom-accent text-white flex items-center justify-center font-bold">+</span> Добавить аккаунт
+        </button>
+    </div>
+
+    <!-- Основной интерфейс -->
+    <div id="app" class="fixed inset-0 z-10 flex flex-col overflow-hidden">
+
+        <button id="fab" onclick="openGroupModal()" class="w-12 h-12 glass border line rounded-2xl flex items-center justify-center text-main shadow-2xl hover:scale-105" title="Создать группу">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+        </button>
+
+        <!-- Вкладка «Чаты» -->
+        <div id="tab-chats" class="flex-1 flex flex-col min-h-0 w-full overflow-hidden">
+            <div class="glass p-4 border-b line flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-custom-accent rounded-2xl flex items-center justify-center text-lg shadow-md font-bold text-white" id="my-avatar-icon">👤</div>
+                    <div class="leading-tight">
+                        <div class="text-xs font-bold" id="my-name">Загрузка...</div>
+                        <div class="text-[10px] text-custom-accent font-medium" id="my-username">@username</div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-3 glass">
+                <input type="text" id="search-input" oninput="searchUsersDebounced()" placeholder="Поиск людей и групп по @username..." autocomplete="off" autocapitalize="none" class="input-field w-full rounded-2xl px-4 py-3 text-xs outline-none focus:border-custom-accent transition">
+            </div>
+            <div id="chats-list" class="flex-1 overflow-y-auto"></div>
+        </div>
+
+        <!-- Вкладка «Настройки» -->
+        <div id="tab-settings" class="flex-1 flex flex-col min-h-0 w-full overflow-hidden hidden">
+            <div class="glass p-4 border-b line text-center">
+                <h3 class="text-sm font-bold">Настройки и кастомизация</h3>
+            </div>
+            <div id="settings-scroll" class="flex-1 overflow-y-auto p-4 space-y-4">
+                <div class="glass p-4 rounded-3xl border line space-y-3">
+                    <div class="text-xs font-semibold text-custom-accent">Личные данные</div>
+                    <div>
+                        <label class="text-[11px] text-muted mb-1 block">Имя (видно другим)</label>
+                        <input type="text" id="settings-name-input" maxlength="12" class="input-field w-full rounded-2xl px-3.5 py-2.5 text-xs outline-none">
+                    </div>
+                    <div>
+                        <label class="text-[11px] text-muted mb-1 block">Юзернейм (неизменяемый)</label>
+                        <input type="text" id="settings-username-static" disabled class="input-field w-full opacity-60 rounded-2xl px-3.5 py-2.5 text-xs">
+                    </div>
+                    <button onclick="saveSettings()" class="w-full bg-custom-accent text-white py-2.5 rounded-2xl text-xs font-semibold shadow-md">Сохранить изменения</button>
+                </div>
+
+                <div class="glass p-4 rounded-3xl border line space-y-3">
+                    <div class="text-xs font-semibold text-custom-accent">Внешний вид и стили</div>
+                    <div>
+                        <label class="text-[11px] text-muted mb-1 block">Тема оформления</label>
+                        <select id="setting-theme" onchange="changeTheme(this.value)" class="input-field w-full rounded-2xl px-3.5 py-2.5 text-xs outline-none">
+                            <option value="theme-rose">Текущая (Rose)</option>
+                            <option value="theme-dark">Тёмная (Dark)</option>
+                            <option value="theme-light">Светлая (Light)</option>
+                            <option value="theme-mono">Монохромная (Mono)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="pt-2">
+                    <button onclick="logout()" class="w-full glass text-rose-400 py-3 rounded-2xl text-xs font-semibold border border-rose-900/30">Выйти из аккаунта</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Нижняя плавающая панель -->
+        <nav id="bottom-nav">
+            <span id="nav-pill"></span>
+            <button onclick="switchTab('chats')" id="nav-chats-btn" class="nav-btn active">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                <span class="text-[10px] font-semibold">Чаты</span>
+            </button>
+            <button onclick="switchTab('settings')" id="nav-settings-btn" class="nav-btn">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                <span class="text-[10px] font-semibold">Настройки</span>
+            </button>
+            <button onclick="toggleAccountsMenu(event)" class="nav-btn">
+                <div class="w-5 h-5 bg-custom-accent rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-sm" id="nav-profile-avatar">👤</div>
+                <span class="text-[10px] font-semibold flex items-center gap-0.5">Профиль <span class="text-[7px]">▼</span></span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- Экран чата -->
+    <div id="chat-screen" class="fixed inset-0 bg-main-a80 backdrop-blur-xl z-30 flex flex-col h-full w-full hidden">
+        <div class="glass p-3 border-b line flex items-center gap-3" style="padding-top: calc(env(safe-area-inset-top, 0px) + 12px)">
+            <button onclick="closeChat()" class="text-muted hover:text-main p-1 text-lg">←</button>
+            <div id="active-peer-header-btn" onclick="openActivePeerProfile()" class="flex items-center gap-3 flex-1 cursor-pointer min-w-0">
+                <div class="w-10 h-10 bg-slate-700 rounded-2xl flex items-center justify-center text-lg shadow-md font-bold text-white shrink-0" id="active-avatar">?</div>
+                <div class="flex-1 overflow-hidden">
+                    <div class="text-xs font-bold truncate" id="active-title">Чат</div>
+                    <div class="text-[10px] text-muted truncate font-medium transition-colors" id="active-sub">@username</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="messages-container" class="flex-1 overflow-y-auto p-4 flex flex-col gap-3"></div>
+
+        <div id="reply-preview-bar" class="hidden px-4 py-2 bg-card-a80 border-t line flex justify-between items-center text-xs animate-entry">
+            <div class="overflow-hidden">
+                <span id="reply-bar-title" class="text-custom-accent font-bold block">Ответ на сообщение</span>
+                <span id="reply-bar-text" class="text-muted truncate block">Текст</span>
+            </div>
+            <button onclick="cancelReplyOrEdit(true)" class="text-muted hover:text-main font-bold ml-2">✕</button>
+        </div>
+
+        <div class="glass p-3 border-t line" id="chat-input-area" style="padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px)">
+            <form onsubmit="sendMessage(event)" class="flex gap-2">
+                <input type="text" id="message-input" oninput="sendTyping()" autocomplete="off" enterkeyhint="send" placeholder="Напишите сообщение..." class="input-field flex-1 min-w-0 rounded-2xl px-4 py-3 text-xs outline-none focus:border-custom-accent transition">
+                <button type="submit" id="send-btn" class="send-btn bg-custom-accent text-white font-semibold px-5 py-3 rounded-2xl text-xs shadow-lg">Отправить</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ───────────────────────── утилиты ─────────────────────────
+        const $ = id => document.getElementById(id);
+        const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+        function readJSON(key, fallback) { try { const v = JSON.parse(localStorage.getItem(key)); return v ?? fallback; } catch (e) { return fallback; } }
+
+        async function api(url, method = 'GET', data) {
+            try {
+                const res = await fetch(url, {
+                    method,
+                    headers: data ? {'Content-Type': 'application/json'} : undefined,
+                    body: data ? JSON.stringify(data) : undefined
+                });
+                let json = null;
+                try { json = await res.json(); } catch (e) {}
+                return { ok: res.ok, status: res.status, data: json };
+            } catch (e) {
+                return { ok: false, status: 0, data: null };
+            }
+        }
+
+        // Ключ собеседника для API: у группы это "g_<id>", у человека — просто число.
+        // Раньше везде стоял `real_id || id`, поэтому для группы уходил голый номер и сервер
+        // путал её с личным чатом пользователя с таким же id.
+        function peerKey(p) { return p.is_group ? 'g_' + p.real_id : String(p.real_id); }
+
+        // ───────────────────────── состояние ─────────────────────────
+        let accounts = readJSON('extera_accounts_v4', []);
+        let currentUser = readJSON('extera_current_user_v4', null);
+        let activePeer = null, currentProfileUser = null;
+        let replyingToMessageId = null, editingMessageId = null, allMessagesMap = {};
+        let renderedSigs = [], lastTypingTime = 0, lastChatsJson = '', chatsFirstRender = true;
+        let pollTimer = null, addingAccount = false, authMode = 'login', currentTab = 'chats';
+        let closeChatTimer = null, ownedGroups = [], searchTimer = null, toastTimer = null, forceScroll = false;
+
+        function getLocalTimeStr() {
+            return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function saveState() {
+            localStorage.setItem('extera_current_user_v4', JSON.stringify(currentUser));
+            localStorage.setItem('extera_accounts_v4', JSON.stringify(accounts));
+        }
+
+        function showToast(text) {
+            const t = $('toast');
+            t.innerText = text;
+            t.classList.add('toast-show');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => t.classList.remove('toast-show'), 2800);
+        }
+
+        // ───────────────────────── анимированный текст ─────────────────────────
+        function splitLetters(el, text) {
+            el.setAttribute('aria-label', text);
+            el.innerHTML = [...text].map((ch, i) =>
+                `<span class="ltr" aria-hidden="true" style="animation-delay:${120 + i * 48}ms">${ch === ' ' ? '&nbsp;' : esc(ch)}</span>`).join('');
+        }
+
+        // ───────────────────────── модалки с анимацией закрытия ─────────────────────────
+        function openModal(id) {
+            const el = $(id);
+            el.classList.remove('is-closing', 'hidden');
+            const card = el.firstElementChild;      // перезапуск анимации появления
+            if (card) { card.style.animation = 'none'; void card.offsetWidth; card.style.animation = ''; }
+        }
+        function closeModal(id) {
+            const el = $(id);
+            if (el.classList.contains('hidden')) return;
+            el.classList.add('is-closing');
+            setTimeout(() => { el.classList.add('hidden'); el.classList.remove('is-closing'); }, 180);
+        }
+
+        // ───────────────────────── авторизация ─────────────────────────
+        function applyAuthMode(mode) {
+            authMode = mode;
+            const reg = mode === 'register';
+            splitLetters($('auth-title'), reg ? 'Регистрация' : 'exteraGram');
+            $('auth-subtitle').innerText = reg ? 'Создайте аккаунт за минуту' : 'Войдите, чтобы продолжить';
+            $('auth-btn').innerText = reg ? 'Зарегистрироваться' : 'Войти';
+            $('auth-toggle-btn').innerText = reg ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Зарегистрироваться';
+            $('auth-password').setAttribute('autocomplete', reg ? 'new-password' : 'current-password');
+            $('auth-card').classList.toggle('is-register', reg);
+        }
+
+        function toggleAuthMode() {
+            const card = $('auth-card');
+            if (card.classList.contains('swapping')) return;
+            card.classList.add('swapping');                       // 1) плавно гасим тексты
+            setTimeout(() => {
+                applyAuthMode(authMode === 'login' ? 'register' : 'login');   // 2) меняем и раскрываем/сворачиваем поле имени
+                $('auth-error').classList.add('hidden');
+                card.classList.remove('swapping');               // 3) плавно показываем новые
+            }, 180);
+        }
+
+        function showAuth() {
+            const screen = $('auth-screen');
+            screen.classList.remove('auth-leave');
+            screen.classList.remove('hidden');
+            $('auth-cancel-btn').classList.toggle('hidden', !(addingAccount && currentUser));
+            applyAuthMode(authMode);
+            // перезапуск «входной» анимации карточки
+            document.querySelectorAll('#auth-screen .reveal, #auth-screen .logo-in').forEach(el => { el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; });
+        }
+
+        function leaveAuth() {
+            const screen = $('auth-screen');
+            screen.classList.add('auth-leave');
+            setTimeout(() => { screen.classList.add('hidden'); screen.classList.remove('auth-leave'); }, 400);
+        }
+
+        function authError(msg) {
+            const errDiv = $('auth-error');
+            errDiv.innerText = msg;
+            errDiv.classList.remove('hidden');
+            const card = $('auth-card');
+            card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake');
+        }
+
+        async function submitAuth() {
+            const username = $('auth-username').value.trim();
+            const password = $('auth-password').value.trim();
+            const displayName = $('auth-display-name').value.trim();
+            const isReg = authMode === 'register';
+            const btn = $('auth-btn');
+
+            if (!username || !password) { authError('Введите юзернейм и пароль!'); return; }
+            if (isReg && (username.length < 4 || username.length > 12 || displayName.length < 1 || displayName.length > 12)) {
+                authError('Юзернейм (4-12) и имя (1-12) символов!'); return;
+            }
+
+            btn.disabled = true;
+            const r = await api(isReg ? '/api/register' : '/api/login', 'POST',
+                isReg ? { username, password, display_name: displayName } : { username, password });
+            btn.disabled = false;
+
+            if (r.ok && r.data && r.data.status === 'ok') {
+                currentUser = r.data.user;
+                if (!accounts.some(a => a.id === currentUser.id)) accounts.push(currentUser);
+                else accounts = accounts.map(a => a.id === currentUser.id ? currentUser : a);
+                saveState();
+                addingAccount = false;
+                $('auth-password').value = '';
+                leaveAuth();
+                startApp();
+            } else {
+                authError((r.data && r.data.message) || 'Нет связи с сервером. Попробуйте ещё раз.');
+            }
+        }
+
+        // Enter отправляет форму входа
+        ['auth-username', 'auth-password', 'auth-display-name'].forEach(id =>
+            $(id).addEventListener('keydown', e => { if (e.key === 'Enter') submitAuth(); }));
+
+        // ───────────────────────── запуск приложения ─────────────────────────
+        function startApp() {
+            updateUserUI();
+            lastChatsJson = '';
+            chatsFirstRender = true;
+            $('chats-list').innerHTML = '';
+            switchTab('chats', true);
+            loadChats(true);
+            if (!pollTimer) pollTimer = setInterval(pollUpdates, 1500);   // один таймер на всё приложение
+        }
+
+        window.addEventListener('load', () => {
+            const savedTheme = localStorage.getItem('extera_theme');
+            if (savedTheme) { document.body.classList.remove('theme-rose'); document.body.classList.add(savedTheme); $('setting-theme').value = savedTheme; }
+
+            if (!currentUser && accounts.length > 0) { currentUser = accounts[0]; saveState(); }
+            if (!currentUser) {
+                showAuth();
+            } else {
+                $('auth-screen').classList.add('hidden');
+                startApp();
+            }
+            movePill();
+        });
+        window.addEventListener('resize', movePill);
+
+        function updateUserUI() {
+            $('my-name').innerText = currentUser.display_name;
+            $('my-username').innerText = '@' + currentUser.username;
+            const av = currentUser.avatar_emoji || currentUser.display_name[0].toUpperCase();
+            $('my-avatar-icon').innerText = av;
+            $('nav-profile-avatar').innerText = av;
+        }
+
+        // ───────────────────────── аккаунты ─────────────────────────
+        function toggleAccountsMenu(e) {
+            e.stopPropagation();
+            const menu = $('accounts-menu');
+            if (menu.classList.contains('hidden')) { renderAccountsList(); menu.classList.remove('hidden'); }
+            else menu.classList.add('hidden');
+        }
+
+        function renderAccountsList() {
+            const list = $('accounts-list');
+            list.innerHTML = '';
+            accounts.forEach(acc => {
+                const isCurrent = acc.id === currentUser.id;
+                const div = document.createElement('div');
+                div.className = `p-2.5 rounded-2xl flex items-center justify-between cursor-pointer transition ${isCurrent ? 'bg-custom-main border line' : 'row-hover'}`;
+                div.onclick = () => switchAccount(acc.id);
+                div.innerHTML = `<div class="flex items-center gap-2.5"><div class="w-7 h-7 bg-custom-accent rounded-full flex items-center justify-center text-xs font-bold text-white">${esc(acc.display_name[0].toUpperCase())}</div><span class="text-xs font-semibold">${esc(acc.display_name)}</span></div>${isCurrent ? '<span class="text-[10px] text-custom-accent font-bold">активен</span>' : ''}`;
+                list.appendChild(div);
+            });
+        }
+
+        function switchAccount(id) {
+            const acc = accounts.find(a => a.id === id);
+            if (!acc || acc.id === currentUser.id) { $('accounts-menu').classList.add('hidden'); return; }
+            currentUser = acc;
+            saveState();
+            $('accounts-menu').classList.add('hidden');
+            if (activePeer) { activePeer = null; $('chat-screen').classList.add('hidden'); }
+            startApp();
+        }
+
+        function startAddAccount() {
+            $('accounts-menu').classList.add('hidden');
+            addingAccount = true;              // текущий аккаунт остаётся активным, пока не войдём в новый
+            authMode = 'login';
+            showAuth();
+        }
+
+        function cancelAddAccount() {
+            addingAccount = false;
+            leaveAuth();
+        }
+
+        document.addEventListener('click', () => $('accounts-menu').classList.add('hidden'));
+
+        // ───────────────────────── вкладки ─────────────────────────
+        function movePill() {
+            const btn = $(currentTab === 'chats' ? 'nav-chats-btn' : 'nav-settings-btn');
+            const pill = $('nav-pill');
+            if (!btn || !pill) return;
+            pill.style.width = btn.offsetWidth + 'px';
+            pill.style.transform = `translateX(${btn.offsetLeft}px)`;
+        }
+
+        function switchTab(tab, silent = false) {
+            const chatsTab = $('tab-chats'), settingsTab = $('tab-settings');
+            const goingRight = tab === 'settings';
+            currentTab = tab;
+
+            const show = tab === 'chats' ? chatsTab : settingsTab;
+            const hide = tab === 'chats' ? settingsTab : chatsTab;
+            hide.classList.add('hidden');
+            show.classList.remove('hidden', 'tab-from-left', 'tab-from-right');
+            if (!silent) { void show.offsetWidth; show.classList.add(goingRight ? 'tab-from-right' : 'tab-from-left'); }
+
+            if (tab === 'chats') {
+                loadChats(true);
+            } else {
+                $('settings-name-input').value = currentUser.display_name;
+                $('settings-username-static').value = '@' + currentUser.username;
+            }
+
+            $('nav-chats-btn').classList.toggle('active', tab === 'chats');
+            $('nav-settings-btn').classList.toggle('active', tab === 'settings');
+            $('fab').classList.toggle('fab-hidden', tab !== 'chats');
+            movePill();
+        }
+
+        function changeTheme(themeClass) {
+            ['theme-rose', 'theme-dark', 'theme-light', 'theme-mono'].forEach(c => document.body.classList.remove(c));
+            document.body.classList.add(themeClass);
+            localStorage.setItem('extera_theme', themeClass);
+        }
+
+        // ───────────────────────── создание группы ─────────────────────────
+        function openGroupModal() {
+            $('group-error').classList.add('hidden');
+            openModal('group-modal');
+        }
+        function closeGroupModal() { closeModal('group-modal'); }
+
+        async function submitCreateGroup() {
+            const name = $('group-name-input').value.trim();
+            const username = $('group-username-input').value.trim();
+            const target_username = $('group-username-target').value.trim();
+            const errDiv = $('group-error');
+            const fail = msg => { errDiv.innerText = msg; errDiv.classList.remove('hidden'); showToast(msg); };
+
+            if (!name) return fail('Введите название группы!');
+            if (username.length < 4 || username.length > 12) return fail('Юзернейм группы должен быть от 4 до 12 символов!');
+            if (!target_username) return fail('Укажите юзернейм первого участника!');
+
+            const r = await api('/api/group/create', 'POST', { user_id: currentUser.id, name, username, target_username, timestamp: getLocalTimeStr() });
+            if (r.ok && r.data && r.data.status === 'ok') {
+                closeGroupModal();
+                ['group-name-input', 'group-username-input', 'group-username-target'].forEach(id => $(id).value = '');
+                loadChats(true);
+                showToast('Группа создана, приглашение отправлено');
+            } else {
+                fail((r.data && r.data.message) || 'Не удалось создать группу');
+            }
+        }
+
+        // ───────────────────────── поиск и список чатов ─────────────────────────
+        function searchUsersDebounced() {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(searchUsers, 220);
+        }
+
+        function rowHTML(c, extra = '') {
+            const isBot = !!c.is_bot;
+            const av = c.is_group && !c.avatar_emoji ? '👥' : (c.avatar_emoji || (c.display_name || '?')[0].toUpperCase());
+            const color = (c.is_group || isBot) ? 'bg-indigo-600' : 'bg-custom-accent';
+            return `<div class="w-11 h-11 ${color} rounded-2xl flex items-center justify-center text-lg shadow-md font-bold text-white shrink-0">${esc(av)}</div>${extra}`;
+        }
+
+        async function searchUsers() {
+            const query = $('search-input').value.trim();
+            const list = $('chats-list');
+            if (!query) { lastChatsJson = ''; loadChats(true); return; }
+            const r = await api(`/api/search?q=${encodeURIComponent(query)}`);
+            if ($('search-input').value.trim() !== query) return;     // пока ждали ответ, запрос уже поменялся
+            const users = Array.isArray(r.data) ? r.data : [];
+            list.innerHTML = users.length ? '' : `<div class="p-6 text-xs text-muted text-center animate-entry">Ничего не найдено</div>`;
+            users.forEach(u => {
+                const isG = !!u.is_group;
+                const dispId = isG ? `g_${u.id}` : (u.is_bot ? `*${u.id}` : `${u.id}`);
+                const item = document.createElement('div');
+                item.className = 'p-3.5 row-hover cursor-pointer flex items-center gap-3.5 transition animate-entry';
+                item.onclick = () => openProfileModal({ ...u, id: dispId, real_id: u.id, is_group: isG });
+                item.innerHTML = rowHTML(u, `<div class="min-w-0"><div class="text-xs font-bold truncate">${esc(u.display_name)}</div><div class="text-[11px] text-custom-accent font-medium">@${esc(u.username)}${isG ? ' · группа' : ''}</div></div>`);
+                list.appendChild(item);
+            });
+        }
+
+        async function loadChats(force = false) {
+            if (!currentUser || $('search-input').value.trim()) return;
+            const uid = currentUser.id;
+            const r = await api(`/api/chats?user_id=${uid}`);
+            if (!currentUser || currentUser.id !== uid || !r.ok || !Array.isArray(r.data)) return;
+            const chats = r.data;
+            ownedGroups = chats.filter(c => c.is_group && c.owner_id === uid);
+            const json = JSON.stringify(chats);
+            if (!force && json === lastChatsJson) return;     // ничего не изменилось — не перерисовываем (раньше список мигал и сбрасывал прокрутку каждые 1.5 с)
+            lastChatsJson = json;
+            renderChats(chats);
+        }
+
+        function renderChats(chats) {
+            const list = $('chats-list');
+            const scroll = list.scrollTop;
+            list.innerHTML = '';
+            chats.forEach((c, i) => {
+                const lastText = c.last_text ? (c.last_text.length > 32 ? c.last_text.substring(0, 32) + '...' : c.last_text) : 'Нет сообщений';
+                const unreadBadge = c.unread > 0 ? `<div class="bg-custom-accent text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md badge-pop">${c.unread}</div>` : '';
+                const pinIcon = c.is_pinned ? `<svg class="w-3.5 h-3.5 inline-block text-custom-accent mr-1 -rotate-45" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.586a6 6 0 108.486 8.486L20.5 13"/></svg>` : '';
+                const groupMark = c.is_group ? '<span class="text-[9px] text-muted ml-1.5">группа</span>' : '';
+
+                const item = document.createElement('div');
+                item.className = 'p-3.5 row-hover cursor-pointer flex items-center gap-3.5 transition' + (chatsFirstRender ? ' row-in' : '');
+                if (chatsFirstRender) item.style.animationDelay = `${Math.min(i, 10) * 55}ms`;
+                item.onclick = () => selectPeer(c);
+                item.innerHTML = rowHTML(c, `<div class="flex-1 overflow-hidden leading-tight"><div class="flex justify-between items-center mb-1"><span class="text-xs font-bold flex items-center truncate">${pinIcon}${esc(c.display_name)}${groupMark}</span><span class="text-[10px] text-muted shrink-0 ml-2">${esc(c.last_time || '')}</span></div><div class="flex justify-between items-center"><span class="text-[11px] text-muted truncate">${esc(lastText)}</span>${unreadBadge}</div></div>`);
+                list.appendChild(item);
+            });
+            chatsFirstRender = false;
+            list.scrollTop = scroll;
+        }
+
+        // ───────────────────────── профиль ─────────────────────────
+        function openProfileModal(user) {
+            currentProfileUser = user;
+            $('profile-name').innerText = user.display_name;
+            $('profile-username').innerText = '@' + user.username;
+            $('profile-id').innerText = user.is_group ? 'g_' + user.real_id : user.real_id;
+            const avatarBox = $('profile-avatar-container');
+            avatarBox.className = `w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg font-bold text-white ${(user.is_bot || user.is_group) ? 'bg-indigo-600' : 'bg-custom-accent'}`;
+            avatarBox.innerText = user.avatar_emoji || user.display_name[0].toUpperCase();
+
+            // блок «пригласить в группу»: только для обычных людей и только если у вас есть своя группа
+            const canInvite = !user.is_bot && !user.is_group && user.real_id !== currentUser.id && ownedGroups.length > 0;
+            $('profile-invite-box').classList.toggle('hidden', !canInvite);
+            if (canInvite) {
+                $('invite-group-select').innerHTML = ownedGroups.map(g => `<option value="${g.real_id}">${esc(g.display_name)}</option>`).join('');
+                $('invite-username-input').value = user.username;
+            }
+            openModal('profile-modal');
+        }
+
+        function openActivePeerProfile() {
+            if (!activePeer) return;
+            if (activePeer.is_group) openGroupSettings();
+            else openProfileModal(activePeer);
+        }
+        function closeProfileModal() { closeModal('profile-modal'); }
+
+        function startChatFromProfile() {
+            if (!currentProfileUser) return;
+            if (!currentProfileUser.is_group && currentProfileUser.real_id === currentUser.id) { showToast('Это вы'); return; }
+            const peer = currentProfileUser;
+            closeProfileModal();
+            $('search-input').value = '';
+            lastChatsJson = '';
+            selectPeer(peer);
+        }
+
+        async function inviteToGroup(groupId, username) {
+            username = username.trim().replace(/^@/, '');
+            if (!username) { showToast('Введите юзернейм'); return false; }
+            const r = await api('/api/group/invite', 'POST', { user_id: currentUser.id, group_id: groupId, username, timestamp: getLocalTimeStr() });
+            if (r.ok && r.data && r.data.status === 'ok') { showToast('Приглашение отправлено'); return true; }
+            showToast((r.data && r.data.message) || 'Не удалось отправить приглашение');
+            return false;
+        }
+
+        async function sendGroupInviteFromProfile() {
+            const gid = parseInt($('invite-group-select').value, 10);
+            if (await inviteToGroup(gid, $('invite-username-input').value)) closeProfileModal();
+        }
+
+        async function sendGroupInviteFromSettings() {
+            if (!activePeer || !activePeer.is_group) return;
+            if (await inviteToGroup(activePeer.real_id, $('gs-invite-input').value)) $('gs-invite-input').value = '';
+        }
+
+        // ───────────────────────── управление группой ─────────────────────────
+        async function refreshActiveGroup() {
+            const r = await api(`/api/chats?user_id=${currentUser.id}`);
+            if (!r.ok || !Array.isArray(r.data) || !activePeer) return false;
+            const fresh = r.data.find(c => c.is_group && c.real_id === activePeer.real_id);
+            if (!fresh) return false;
+            Object.assign(activePeer, fresh);
+            return true;
+        }
+
+        async function openGroupSettings() {
+            if (!activePeer || !activePeer.is_group) return;
+            if (!activePeer.members_info && !(await refreshActiveGroup())) { showToast('Вы не участник этой группы'); return; }
+            fillGroupSettings();
+            const screen = $('group-settings-screen');
+            screen.classList.remove('hidden', 'slide-down-screen');
+            screen.classList.add('slide-up-screen');
+        }
+
+        function fillGroupSettings() {
+            $('gs-name-title').innerText = activePeer.display_name;
+            $('gs-username-title').innerText = '@' + activePeer.username;
+            $('gs-name-input').value = activePeer.display_name;
+            $('gs-username-input').value = activePeer.username;
+            $('gs-avatar').innerText = activePeer.avatar_emoji;
+            $('gs-error').classList.add('hidden');
+            const isOwner = activePeer.owner_id === currentUser.id;
+            $('gs-owner-controls').classList.toggle('hidden', !isOwner);
+            $('gs-delete-btn').classList.toggle('hidden', !isOwner);
+            renderGroupMembers();
+        }
+
+        function closeGroupSettings() {
+            const screen = $('group-settings-screen');
+            screen.classList.remove('slide-up-screen');
+            screen.classList.add('slide-down-screen');
+            setTimeout(() => { screen.classList.add('hidden'); screen.classList.remove('slide-down-screen'); }, 260);
+        }
+
+        function renderGroupMembers() {
+            const list = $('gs-members-list');
+            list.innerHTML = '';
+            const isOwner = activePeer.owner_id === currentUser.id;
+            (activePeer.members_info || []).forEach(m => {
+                const div = document.createElement('div');
+                div.className = 'flex justify-between items-center bg-custom-main p-2.5 rounded-2xl text-xs gap-2';
+                const you = m.id === currentUser.id ? ' <span class="text-muted">(вы)</span>' : '';
+                const crown = m.id === activePeer.owner_id ? ' <span class="text-[9px] text-custom-accent font-bold">создатель</span>' : '';
+                div.innerHTML = `<div class="flex items-center gap-2.5 min-w-0"><div class="w-8 h-8 bg-custom-accent rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0">${esc(m.display_name[0].toUpperCase())}</div><div class="min-w-0"><div class="font-semibold truncate">${esc(m.display_name)}${you}${crown}</div><div class="text-[10px] text-muted">@${esc(m.username)}</div></div></div>`;
+                if (isOwner && m.id !== currentUser.id) {
+                    const kickBtn = document.createElement('button');
+                    kickBtn.className = 'text-rose-400 font-semibold hover:underline shrink-0';
+                    kickBtn.innerText = 'Выгнать';
+                    kickBtn.onclick = () => confirmKick(m.id, m.display_name);
+                    div.appendChild(kickBtn);
+                }
+                list.appendChild(div);
+            });
+        }
+
+        async function confirmKick(targetId, name) {
+            if (!confirm(`Выгнать «${name}» из группы?`)) return;
+            const r = await api('/api/group/kick', 'POST', { user_id: currentUser.id, group_id: activePeer.real_id, target_id: targetId });
+            if (r.ok && r.data && r.data.status === 'ok') {
+                await refreshActiveGroup();
+                renderGroupMembers();
+                showToast('Участник выгнан');
+            } else {
+                showToast((r.data && r.data.message) || 'Не удалось выгнать участника');
+            }
+        }
+
+        async function saveGroupSettings() {
+            const name = $('gs-name-input').value.trim();
+            const username = $('gs-username-input').value.trim();
+            const errDiv = $('gs-error');
+            const fail = msg => { errDiv.innerText = msg; errDiv.classList.remove('hidden'); showToast(msg); };
+            if (!name) return fail('Введите название группы!');
+            if (username.length < 4 || username.length > 12) return fail('Юзернейм должен быть от 4 до 12 символов!');
+
+            const r = await api('/api/group/update', 'POST', { user_id: currentUser.id, group_id: activePeer.real_id, name, username });
+            if (r.ok && r.data && r.data.status === 'ok') {
+                await refreshActiveGroup();
+                fillGroupSettings();
+                $('active-title').innerText = activePeer.display_name;
+                $('active-avatar').innerText = activePeer.avatar_emoji;
+                showToast('Сохранено!');
+            } else {
+                fail((r.data && r.data.message) || 'Не удалось сохранить');
+            }
+        }
+
+        async function deleteGroup() {
+            if (!confirm('Удалить группу навсегда?')) return;
+            const r = await api('/api/group/delete', 'POST', { user_id: currentUser.id, group_id: activePeer.real_id });
+            if (r.ok && r.data && r.data.status === 'ok') {
+                closeGroupSettings();
+                closeChat();
+                showToast('Группа удалена');
+            } else {
+                showToast((r.data && r.data.message) || 'Не удалось удалить группу');
+            }
+        }
+
+        // ───────────────────────── экран чата ─────────────────────────
+        function subtitleFor(peer) { return peer.is_group ? 'группа' : '@' + peer.username; }
+        function setSub(text, typing) {
+            const el = $('active-sub');
+            el.innerText = text;
+            el.classList.toggle('text-custom-accent', !!typing);
+        }
+
+        async function selectPeer(peer) {
+            clearTimeout(closeChatTimer);
+            activePeer = peer; renderedSigs = []; allMessagesMap = {};
+            cancelReplyOrEdit(true);
+            $('active-title').innerText = peer.display_name;
+            setSub(subtitleFor(peer), false);
+            $('active-avatar').innerText = peer.avatar_emoji || peer.display_name[0].toUpperCase();
+            $('messages-container').innerHTML = '';
+
+            const chatScreen = $('chat-screen');
+            chatScreen.classList.remove('hidden', 'slide-out-screen');
+            chatScreen.classList.add('slide-in-screen');
+
+            await fetchMessages(true);
+            if (activePeer === peer && !peer.is_group) {
+                await api(`/api/read/${peerKey(peer)}`, 'POST', { user_id: currentUser.id });
+            }
+        }
+
+        function closeChat() {
+            const chatScreen = $('chat-screen');
+            activePeer = null; renderedSigs = [];
+            chatScreen.classList.remove('slide-in-screen');
+            chatScreen.classList.add('slide-out-screen');
+            clearTimeout(closeChatTimer);
+            closeChatTimer = setTimeout(() => {
+                chatScreen.classList.add('hidden');
+                chatScreen.classList.remove('slide-out-screen');
+                lastChatsJson = '';
+                loadChats(true);
+            }, 240);
+        }
+
+        const msgSig = m => [m.id, m.text, m.is_edited, m.is_read, m.invite_status].join('|');
+
+        function updateEmptyState(count) {
+            const container = $('messages-container');
+            const old = $('empty-state');
+            if (old) old.remove();
+            if (count === 0) {
+                const div = document.createElement('div');
+                div.id = 'empty-state';
+                div.className = 'm-auto text-center text-xs text-muted animate-entry';
+                div.innerHTML = '<div class="text-3xl mb-2">💬</div>Нет сообщений.<br>Напишите первым!';
+                container.appendChild(div);
+            }
+        }
+
+        async function fetchMessages(isInit = false) {
+            const peer = activePeer;
+            if (!peer || !currentUser) return;
+            const r = await api(`/api/messages/${peerKey(peer)}?user_id=${currentUser.id}`);
+            if (peer !== activePeer || !r.ok || !r.data) return;      // успели переключиться на другой чат
+            const data = r.data;
+            const container = $('messages-container');
+            const inputArea = $('chat-input-area');
+
+            if (data.error) {
+                inputArea.classList.add('hidden');
+                if (renderedSigs[0] !== 'err:' + data.error) {
+                    container.innerHTML = `<div class="m-auto p-6 text-xs text-rose-400 text-center font-medium animate-entry">${esc(data.error)}</div>`;
+                    renderedSigs = ['err:' + data.error];
+                }
+                return;
+            }
+            inputArea.classList.remove('hidden');
+            setSub(data.typing ? 'печатает...' : subtitleFor(peer), data.typing);
+
+            const msgs = data.messages || [];
+            allMessagesMap = {};
+            msgs.forEach(m => allMessagesMap[m.id] = m);
+
+            const sigs = msgs.map(msgSig);
+            const unchanged = sigs.length === renderedSigs.length && sigs.every((s, i) => s === renderedSigs[i]);
+            if (unchanged && !isInit) return;
+
+            // только добавились новые сообщения в конец — дорисовываем их; иначе (правка, удаление, «прочитано») перерисовываем всё
+            const onlyAppended = !isInit && renderedSigs.length > 0 && renderedSigs.length <= sigs.length && renderedSigs.every((s, i) => s === sigs[i]);
+            const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 140;
+            const prevTop = container.scrollTop;
+
+            const ownLast = msgs.length && msgs[msgs.length - 1].sender_id === currentUser.id;
+            if (onlyAppended) {
+                const old = $('empty-state'); if (old) old.remove();
+                msgs.slice(renderedSigs.length).forEach(m => appendMessage(m, true));
+            } else {
+                container.innerHTML = '';
+                msgs.forEach(m => appendMessage(m, false));
+            }
+            renderedSigs = sigs;
+            updateEmptyState(msgs.length);
+
+            if (isInit || forceScroll || (onlyAppended && (nearBottom || ownLast))) {
+                container.scrollTo({ top: container.scrollHeight, behavior: isInit ? 'auto' : 'smooth' });
+                forceScroll = false;
+            } else if (!onlyAppended) {
+                container.scrollTop = prevTop;
+            }
+        }
+
+        function sendTyping() {
+            if (!activePeer || activePeer.is_group || activePeer.real_id === 1) return;
+            const now = Date.now();
+            if (now - lastTypingTime > 2000) {
+                lastTypingTime = now;
+                api('/api/typing', 'POST', { user_id: currentUser.id, peer_id: activePeer.real_id });
+            }
+        }
+
+        async function pollUpdates() {
+            if (!currentUser || document.hidden) return;
+            if (!$('tab-chats').classList.contains('hidden') && !activePeer) loadChats();
+            if (activePeer) await fetchMessages(false);
+        }
+
+        async function sendMessage(e) {
+            e.preventDefault();
+            const input = $('message-input');
+            const text = input.value.trim();
+            if (!text || !activePeer) return;
+            input.value = '';
+
+            if (editingMessageId) {
+                const r = await api(`/api/message/${editingMessageId}`, 'PUT', { user_id: currentUser.id, text });
+                if (!r.ok) showToast('Не удалось изменить сообщение');
+                cancelReplyOrEdit(false);
+            } else {
+                const r = await api('/api/send', 'POST', {
+                    user_id: currentUser.id,
+                    receiver_id: peerKey(activePeer),       // для группы уйдёт "g_<id>"
+                    text,
+                    reply_to: replyingToMessageId,
+                    timestamp: getLocalTimeStr()
+                });
+                if (!r.ok || !r.data || r.data.status !== 'ok') showToast((r.data && r.data.message) || 'Ошибка отправки');
+                cancelReplyOrEdit(false);
+                forceScroll = true;
+            }
+            await fetchMessages(false);
+        }
+
+        // ───────────────────────── сообщения ─────────────────────────
+        function formatMessageText(text) {
+            return esc(text).replace(/@([a-zA-Z0-9_]+)/g, '<span class="mention" data-user="$1">@$1</span>');
+        }
+
+        async function openMention(username) {
+            const r = await api(`/api/search?q=${encodeURIComponent(username)}`);
+            const users = Array.isArray(r.data) ? r.data : [];
+            if (users.length > 0) {
+                const u = users[0];
+                const isG = !!u.is_group;
+                const dispId = isG ? `g_${u.id}` : (u.is_bot ? `*${u.id}` : `${u.id}`);
+                openProfileModal({ ...u, id: dispId, real_id: u.id, is_group: isG });
+            } else {
+                showToast('Пользователь не найден');
+            }
+        }
+
+        function appendMessage(m, animate) {
+            const container = $('messages-container');
+            const isGroup = activePeer && activePeer.is_group;
+            const isSelf = m.sender_id === currentUser.id;
+            const div = document.createElement('div');
+            div.id = `msg-${m.id}`;
+
+            // системные записи в группе (создана, вступил...) — по центру, без пузыря
+            if (isGroup && m.sender_id === 1) {
+                div.className = 'sys-msg' + (animate ? ' animate-entry' : '');
+                div.innerText = m.text;
+                container.appendChild(div);
+                return;
+            }
+
+            div.className = `msg flex flex-col ${isSelf ? 'items-end' : 'items-start'}` + (animate ? ' animate-entry' : '');
+
+            let replyHTML = '';
+            if (m.reply_to && allMessagesMap[m.reply_to]) {
+                replyHTML = `<div class="bg-black/20 border-l-2 border-custom-accent px-2 py-1 mb-1 rounded text-[10px] opacity-80 truncate max-w-full">Ответ: ${esc(allMessagesMap[m.reply_to].text)}</div>`;
+            }
+            const editMark = m.is_edited ? '<span class="text-[8px] opacity-70 mr-1">изменено</span>' : '';
+            const readCheck = (isSelf && !isGroup) ? (m.is_read ? '<span class="inline-block text-[10px] tracking-tighter font-bold ml-1">✓✓</span>' : '<span class="inline-block text-[10px] font-bold ml-1 opacity-80">✓</span>') : '';
+            const senderName = (isGroup && !isSelf) ? `<div class="text-[10px] font-bold text-custom-accent mb-0.5">${esc(m.sender_name || 'Участник')}</div>` : '';
+
+            let inviteHTML = '';
+            if (m.invite_id) {
+                if (m.invite_status === 'pending') {
+                    inviteHTML = `<div class="mt-2 flex gap-2"><button data-act="invite-accept" data-invite="${m.invite_id}" class="bg-custom-accent text-white px-3 py-1 rounded-xl text-xs font-semibold">Принять</button><button data-act="invite-reject" data-invite="${m.invite_id}" class="bg-slate-800 text-slate-300 px-3 py-1 rounded-xl text-xs font-semibold">Отклонить</button></div>`;
+                } else {
+                    inviteHTML = `<div class="mt-2 text-[10px] font-semibold opacity-70">${m.invite_status === 'accepted' ? '✓ Вы вступили в группу' : '✕ Приглашение отклонено'}</div>`;
+                }
+            }
+
+            div.innerHTML = `
+                <div class="bubble ${isSelf ? 'bubble-self bg-custom-accent text-white' : 'bubble-other'} px-4 py-2.5 rounded-3xl max-w-[85%] text-xs shadow-sm leading-relaxed break-words cursor-pointer">
+                    ${senderName}${replyHTML}
+                    <div class="whitespace-pre-wrap">${formatMessageText(m.text)}</div>
+                    ${inviteHTML}
+                    <div class="flex items-center justify-end gap-0.5 mt-1">
+                        ${editMark}
+                        <span class="text-[9px] ${isSelf ? 'text-white/80' : 'text-muted'} font-medium">${esc(m.timestamp)}</span>
+                        ${readCheck}
+                    </div>
+                </div>
+                <div class="msg-actions gap-1 mt-1 glass border line p-1 rounded-xl shadow-md">
+                    <button data-act="reply" data-id="${m.id}" title="Ответить" class="px-1.5 py-0.5 text-xs">↩️</button>
+                    ${isSelf ? `<button data-act="edit" data-id="${m.id}" title="Редактировать" class="px-1.5 py-0.5 text-xs">✏️</button><button data-act="delete" data-id="${m.id}" title="Удалить" class="px-1.5 py-0.5 text-xs">🗑️</button>` : ''}
+                </div>`;
+            container.appendChild(div);
+        }
+
+        // Одно место для всех кликов по сообщениям: упоминания, кнопки действий, приглашения.
+        // Нажатие на пузырь показывает панель «ответить / изменить / удалить» (на телефоне нет hover).
+        $('messages-container').addEventListener('click', e => {
+            const mention = e.target.closest('.mention');
+            if (mention) { openMention(mention.dataset.user); return; }
+
+            const actBtn = e.target.closest('[data-act]');
+            if (actBtn) {
+                const act = actBtn.dataset.act, id = parseInt(actBtn.dataset.id, 10);
+                if (act === 'reply') setReply(id);
+                else if (act === 'edit') startEdit(id);
+                else if (act === 'delete') deleteMsg(id);
+                else if (act === 'invite-accept') groupAction('accept', parseInt(actBtn.dataset.invite, 10));
+                else if (act === 'invite-reject') groupAction('reject', parseInt(actBtn.dataset.invite, 10));
+                document.querySelectorAll('.msg.show-actions').forEach(el => el.classList.remove('show-actions'));
+                return;
+            }
+
+            const msg = e.target.closest('.msg');
+            const wasOpen = msg && msg.classList.contains('show-actions');
+            document.querySelectorAll('.msg.show-actions').forEach(el => el.classList.remove('show-actions'));
+            if (msg && !wasOpen) msg.classList.add('show-actions');
+        });
+
+        async function groupAction(action, inviteId) {
+            const r = await api('/api/group/action', 'POST', { user_id: currentUser.id, action, invite_id: inviteId, timestamp: getLocalTimeStr() });
+            if (r.ok && r.data && r.data.status === 'ok') {
+                showToast(action === 'accept' ? 'Вы вступили в группу!' : 'Приглашение отклонено');
+            } else {
+                showToast((r.data && r.data.message) || 'Не удалось обработать приглашение');
+            }
+            await fetchMessages(false);
+            lastChatsJson = '';
+            loadChats(true);
+        }
+
+        function setReply(id) {
+            replyingToMessageId = id;
+            editingMessageId = null;
+            const msg = allMessagesMap[id];
+            $('reply-bar-title').innerText = 'Ответ на сообщение';
+            $('reply-bar-text').innerText = msg ? msg.text : '';
+            $('reply-preview-bar').classList.remove('hidden');
+            $('message-input').focus();
+        }
+
+        function startEdit(id) {
+            const msg = allMessagesMap[id];
+            if (!msg) return;
+            editingMessageId = id;
+            replyingToMessageId = null;
+            $('reply-bar-title').innerText = 'Редактирование сообщения';
+            $('reply-bar-text').innerText = msg.text;
+            $('reply-preview-bar').classList.remove('hidden');
+            const input = $('message-input');
+            input.value = msg.text;
+            input.focus();
+        }
+
+        // clearInput = true: пользователь сам отменил (✕) или открыл другой чат — стираем и поле ввода
+        function cancelReplyOrEdit(clearInput) {
+            const wasEditing = editingMessageId !== null;
+            replyingToMessageId = null;
+            editingMessageId = null;
+            $('reply-preview-bar').classList.add('hidden');
+            if (clearInput || wasEditing) $('message-input').value = '';
+        }
+
+        async function deleteMsg(id) {
+            if (!confirm('Удалить сообщение?')) return;
+            const r = await api(`/api/message/${id}`, 'DELETE', { user_id: currentUser.id });
+            if (!r.ok) showToast('Не удалось удалить сообщение');
+            await fetchMessages(false);
+        }
+
+        // ───────────────────────── настройки ─────────────────────────
+        async function saveSettings() {
+            const newName = $('settings-name-input').value.trim();
+            if (newName.length < 1 || newName.length > 12) { showToast('Имя от 1 до 12 символов!'); return; }
+            const r = await api('/api/settings', 'POST', { user_id: currentUser.id, display_name: newName });
+            if (r.ok && r.data && r.data.status === 'ok') {
+                currentUser.display_name = newName;
+                const idx = accounts.findIndex(a => a.id === currentUser.id);
+                if (idx !== -1) accounts[idx] = currentUser;
+                saveState();
+                updateUserUI();
+                showToast('Сохранено!');
+            } else {
+                showToast((r.data && r.data.message) || 'Не удалось сохранить');
+            }
+        }
+
+        // Выходим только из текущего аккаунта (раньше localStorage.clear() выкидывал из всех сразу)
+        function logout() {
+            accounts = accounts.filter(a => a.id !== currentUser.id);
+            if (accounts.length > 0) {
+                currentUser = accounts[0];
+                saveState();
+                startApp();
+                showToast('Вы вышли. Активен аккаунт «' + currentUser.display_name + '»');
+            } else {
+                currentUser = null;
+                localStorage.removeItem('extera_current_user_v4');
+                localStorage.setItem('extera_accounts_v4', '[]');
+                activePeer = null;
+                $('chat-screen').classList.add('hidden');
+                authMode = 'login';
+                showAuth();
+            }
+        }
+    </script>
+</body>
+</html>
