@@ -1,11 +1,14 @@
 import sqlite3, time, os
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'extera-pro-2026'
 DB_NAME, ADMIN_BOT_ID = "extera.db", 1
 
+@app.route('/manifest.json')
+def serve_manifest():
+    return send_from_directory('.', 'manifest.json')
 
 # ───────────────────────── helpers ─────────────────────────
 
