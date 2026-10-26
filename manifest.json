@@ -1,0 +1,9 @@
+{
+  "name": "exteraGram",
+  "short_name": "exteraGram",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#e11d48",
+  "icons": []
+}
