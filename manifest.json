@@ -5,11 +5,13 @@
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#e11d48",
-    "icons": [
+  "description": "Cross-border secure web messenger",
+  "icons": [
     {
-      "src": "/launchericon-512×512.png",
+      "src": "https://exteragram.onrender.com/launchericon-512x512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
