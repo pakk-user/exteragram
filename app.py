@@ -1,4 +1,4 @@
-import sqlite3, time
+import sqlite3, time, os
 from flask import Flask, render_template, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -529,6 +529,7 @@ def delete_group():
     return jsonify({"status": "ok"})
 
 
+init_db()
+
 if __name__ == '__main__':
-    init_db()
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
