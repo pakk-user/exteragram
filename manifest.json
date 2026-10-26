@@ -8,7 +8,7 @@
   "description": "Cross-border secure web messenger",
   "icons": [
     {
-      "src": "/launchericon-512x512.png",
+      "src": "/static/launchericon-512x512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
