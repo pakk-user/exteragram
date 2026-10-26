@@ -8,10 +8,9 @@
   "description": "Cross-border secure web messenger",
   "icons": [
     {
-      "src": "https://exteragram.onrender.com/launchericon-512x512.png",
+      "src": "/launchericon-512x512.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     }
   ]
 }
