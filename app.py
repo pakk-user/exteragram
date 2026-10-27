@@ -2,6 +2,8 @@ import uuid
 import turso_db, time, os, base64, io, uuid, mimetypes, json, shutil
 from flask_sock import Sock
 import threading
+from functools import wraps
+from flask import g
 from flask import Flask, render_template, request, jsonify, send_from_directory, Response, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -88,8 +90,10 @@ def chat_key(uid, rid):
 
 def hidden_filter(cur, uid, peer):
     """SQL-кусок (для таблицы messages m): прячет то, что человек очистил или удалил у себя."""
-    row = cur.execute("SELECT upto FROM chat_clear WHERE user_id = ? AND peer = ?", (uid, str(peer))).fetchone()
-    return " AND m.id > ? AND m.id NOT IN (SELECT msg_id FROM hidden_msgs WHERE user_id = ?)", [row['upto'] if row else 0, uid]
+    memo = getattr(g, '_clr', None)
+    if memo is None or memo[0] != uid:
+        memo = g._clr = (uid, {r['peer']: r['upto'] for r in cur.execute("SELECT peer, upto FROM chat_clear WHERE user_id = ?", (uid,)).fetchall()})
+    return " AND m.id > ? AND m.id NOT IN (SELECT msg_id FROM hidden_msgs WHERE user_id = ?)", [memo[1].get(str(peer), 0), uid]
 
 
 def cleanup_orphans(cur):
@@ -101,7 +105,16 @@ def cleanup_orphans(cur):
     purge_files(cur)
 
 
+_purge_t = [0]
+
+
 def purge_expired(cur):
+    now = time.time()
+    if now - _purge_t[0] < 5:
+        return
+    _purge_t[0] = now
+    if not cur.execute("SELECT 1 FROM messages WHERE expire_at IS NOT NULL AND expire_at < ? LIMIT 1", (now,)).fetchone():
+        return
     if cur.execute("DELETE FROM messages WHERE expire_at IS NOT NULL AND expire_at < ?", (time.time(),)).rowcount:
         cleanup_orphans(cur)
 
@@ -213,8 +226,31 @@ def ws_endpoint(ws):
                 _ws_clients.pop(uid, None)
 
 
+_ver, _cache = [0], {}   # _ver растёт при любой записи → весь кэш мгновенно устаревает
+
+
+def cached(ttl):
+    def deco(fn):
+        @wraps(fn)
+        def w(*a, **k):
+            key, v = request.full_path, _ver[0]
+            hit = _cache.get(key)
+            if hit and hit[0] == v and time.time() - hit[1] < ttl:
+                return Response(hit[2], mimetype='application/json')
+            resp = fn(*a, **k)
+            if isinstance(resp, Response) and resp.status_code == 200 and resp.mimetype == 'application/json':
+                if len(_cache) > 300:
+                    _cache.clear()
+                _cache[key] = (v, time.time(), resp.get_data())   # v взят ДО расчёта: если во время него была запись — запись не сохранится как свежая
+            return resp
+        return w
+    return deco
+
+
 @app.after_request
 def ws_notify(response):
+    if request.method in ('POST', 'PUT', 'DELETE') and request.path != '/api/ping':
+        _ver[0] += 1
     if request.path.startswith('/api/') and request.method in ('POST', 'PUT', 'DELETE') and response.status_code < 400 \
             and request.path not in ('/api/typing', '/api/ping', '/api/read/'):
         ws_push('upd')   # мало пользователей → всем; клиент сам дебаунсит
@@ -445,6 +481,7 @@ def search():
 # ───────────────────────── список чатов ─────────────────────────
 
 @app.route('/api/chats', methods=['GET'])
+@cached(5)
 def chats():
     uid = request.args.get('user_id', type=int)
     if not uid:
@@ -606,6 +643,7 @@ def get_ttl(cur, uid, peer):
 
 
 @app.route('/api/messages/<peer_id>', methods=['GET'])
+@cached(2.5)
 def get_messages(peer_id):
     uid = request.args.get('user_id', type=int)
     if not uid:
