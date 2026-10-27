@@ -247,6 +247,19 @@ def cached(ttl):
     return deco
 
 
+@app.before_request
+def _t_start():
+    g._t0, g._n0, g._s0 = time.time(), turso_db.STAT['n'], turso_db.STAT['t']
+
+
+@app.after_request
+def _t_log(response):
+    if request.path.startswith('/api/') and hasattr(g, '_t0'):
+        print('PERF %s %s %dms turso_calls=%d turso_ms=%d' % (request.method, request.path, (time.time() - g._t0) * 1000,
+              turso_db.STAT['n'] - g._n0, (turso_db.STAT['t'] - g._s0) * 1000), flush=True)
+    return response
+
+
 @app.after_request
 def ws_notify(response):
     if request.method in ('POST', 'PUT', 'DELETE') and request.path != '/api/ping':

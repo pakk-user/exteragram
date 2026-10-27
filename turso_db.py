@@ -1,7 +1,8 @@
 """Тонкая обёртка над Turso (libSQL по HTTP, протокол Hrana) с интерфейсом, похожим на sqlite3.
 Нужны только `requests` и переменные окружения TURSO_DATABASE_URL / TURSO_AUTH_TOKEN.
 Если TURSO_DATABASE_URL не задан — работает обычный локальный sqlite-файл (для разработки)."""
-import os, base64, sqlite3, requests
+import os, base64, sqlite3, requests, time
+STAT = {'n': 0, 't': 0.0}   # счётчик HTTP-запросов к Turso и время в них (для лога)
 from requests.adapters import HTTPAdapter
 
 URL = (os.environ.get('TURSO_DATABASE_URL') or '').strip()
@@ -115,7 +116,9 @@ class Connection:
         last = None
         for attempt in range(2 if self.baton is None else 1):   # ретрай только вне транзакции
             try:
+                _t0 = time.time()
                 r = _session.post(self.base + '/v2/pipeline', json=body, headers=headers, timeout=25)
+                STAT['n'] += 1; STAT['t'] += time.time() - _t0
                 break
             except requests.RequestException as e:
                 last = e
