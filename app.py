@@ -1,11 +1,14 @@
 import uuid
 import turso_db, time, os, base64, io, uuid, mimetypes, json, shutil
+from flask_sock import Sock
+import threading
 from flask import Flask, render_template, request, jsonify, send_from_directory, Response, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
 
 MAX_ACCOUNTS = 3
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'extera-pro-2026'
+sock = Sock(app)
 app.config['TEMPLATES_AUTO_RELOAD'] = True   # правки index.html видны без перезапуска сервера
 DB_NAME, ADMIN_BOT_ID = "extera.db", 1
 
@@ -173,6 +176,48 @@ def add_header(response):
     if 'Cache-Control' not in response.headers:   # аватарки отдают свой кэш
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
         response.headers['Pragma'] = 'no-cache'
+    return response
+
+
+
+# ───────────────────────── WebSocket: сервер только пушит «обновись», данные клиент берёт обычными GET ─────────────────────────
+_ws_clients, _ws_lock = {}, threading.Lock()   # uid -> {ws}
+
+
+def ws_push(msg, only=None):
+    with _ws_lock:
+        targets = [w for u, s in _ws_clients.items() if only is None or u in only for w in s]
+    for w in targets:
+        try:
+            w.send(msg)
+        except Exception:
+            pass
+
+
+@sock.route('/ws')
+def ws_endpoint(ws):
+    uid = to_int(request.args.get('user_id'))
+    if not uid:
+        return
+    with _ws_lock:
+        _ws_clients.setdefault(uid, set()).add(ws)
+    try:
+        while True:
+            ws.receive(timeout=25)   # клиент шлёт 'p' раз в 25с; пустой тайм-аут тоже ок
+    except Exception:
+        pass
+    finally:
+        with _ws_lock:
+            _ws_clients.get(uid, set()).discard(ws)
+            if not _ws_clients.get(uid):
+                _ws_clients.pop(uid, None)
+
+
+@app.after_request
+def ws_notify(response):
+    if request.path.startswith('/api/') and request.method in ('POST', 'PUT', 'DELETE') and response.status_code < 400 \
+            and request.path not in ('/api/typing', '/api/ping', '/api/read/'):
+        ws_push('upd')   # мало пользователей → всем; клиент сам дебаунсит
     return response
 
 
@@ -622,6 +667,7 @@ def update_typing():
         conn.execute("INSERT OR REPLACE INTO typing (user_id, peer_id, timestamp) VALUES (?, ?, ?)", (uid, peer_id, time.time()))
         conn.commit()
         conn.close()
+        ws_push('typing', only={peer_id})
     return jsonify({"status": "ok"})
 
 
