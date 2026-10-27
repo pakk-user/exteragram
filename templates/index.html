@@ -1402,7 +1402,8 @@
             $('chats-list').innerHTML = '';
             switchTab('chats', true);
             loadChats(true);
-            if (!pollTimer) pollTimer = setInterval(pollUpdates, 1500);   // один таймер на всё приложение
+            if (!pollTimer) pollTimer = setInterval(() => { if (!wsAlive()) pollUpdates(); }, 3000);   // резерв, если WebSocket лежит
+            wsConnect();
         }
 
         window.addEventListener('load', () => {
@@ -2095,7 +2096,27 @@
             });
             unreadMap = next;
         }
-        setInterval(checkIncoming, 3000);
+        setInterval(() => { if (!wsAlive()) checkIncoming(); }, 3000);
+
+
+        // ───────────────────────── WebSocket ─────────────────────────
+        let ws = null, wsUid = null, wsRetry = 0, wsDeb = null, wsTyp = null;
+        const wsAlive = () => ws && ws.readyState === 1;
+        function wsRefresh() { clearTimeout(wsDeb); wsDeb = setTimeout(() => { pollUpdates(); checkIncoming(); }, 150); }
+        function wsConnect() {
+            if (!currentUser || (ws && ws.readyState <= 1 && wsUid === currentUser.id)) return;
+            if (ws) { try { ws.close(); } catch (e) {} }
+            wsUid = currentUser.id;
+            ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?user_id=' + wsUid);
+            ws.onopen = () => { wsRetry = 0; wsRefresh(); };
+            ws.onmessage = e => {
+                if (e.data === 'upd') wsRefresh();
+                else if (e.data === 'typing') { if (activePeer && !document.hidden) { fetchMessages(false); clearTimeout(wsTyp); wsTyp = setTimeout(() => fetchMessages(false), 3200); } }
+            };
+            ws.onclose = () => { ws = null; setTimeout(wsConnect, Math.min(15000, 1000 * ++wsRetry)); };
+        }
+        setInterval(() => { if (wsAlive()) ws.send('p'); else if (currentUser) wsConnect(); }, 25000);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden && currentUser) { wsConnect(); wsRefresh(); } });
 
         async function pollUpdates() {
             if (!currentUser || document.hidden) return;
