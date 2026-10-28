@@ -2584,6 +2584,8 @@
                 }
             }
 
+            if (m.btn === 'appeal') inviteHTML = `<div class="mt-2"><button data-act="appeal" class="bg-custom-accent text-white px-3 py-1 rounded-xl text-xs font-semibold">Обжаловать</button></div>`;
+
             div.innerHTML = `
                 ${rowOpen}<div class="bubble ${isSelf ? 'bubble-self bg-custom-accent text-white' : 'bubble-other'} px-4 py-2.5 rounded-3xl max-w-[85%] text-xs shadow-sm leading-relaxed break-words cursor-pointer">
                     ${senderName}${fwdHTML}${replyHTML}
@@ -2641,6 +2643,7 @@
                 else if (act === 'vseek') seekVoice(id, e);
                 else if (act === 'invite-accept') groupAction('accept', parseInt(actBtn.dataset.invite, 10));
                 else if (act === 'invite-reject') groupAction('reject', parseInt(actBtn.dataset.invite, 10));
+                else if (act === 'appeal') openSupport();
                 document.querySelectorAll('.msg.show-actions').forEach(el => el.classList.remove('show-actions'));
                 return;
             }
